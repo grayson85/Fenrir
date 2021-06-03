@@ -1,22 +1,47 @@
----
+--
 - hosts: Linux
-  remote_user: root
+  remote_user: ansible
+  become: yes
 
   tasks:
     - name: Create folder for temporary RAM drive
-      command: mkdir /mnt/temp_ram creates=/mnt/temp_ram
+#      command: mkdir /mnt/temp_ram creates=/mnt/temp_ram
+      file:
+        path: /mnt/temp_ram
+        state: directory
+        
     - name: Create Fenrir RAM drive on target
-      command: mount -t ramfs -o size=30M ramfs /mnt/temp_ram/
+#      command: mount -t ramfs -o size=30M ramfs /mnt/temp_ram/
+      mount:
+        path: /mnt/temp_ram
+        src: ramfs
+        state: mounted
+        fstype: ramfs
+        opts: rw,relatime,size=30M
+        
     - name: Copy Fenrir to RAM drive
-      copy: src=/home/control/Ansible/Fenrir/ dest=/mnt/temp_ram/
+      copy: src=/root/Fenrir-master/ dest=/mnt/temp_ram/
+      
     - name: Make Fenrir Executeable
       file: path=/mnt/temp_ram/fenrir.sh state=touch mode="0555"
+      
     - name: Execute Fenrir
-      command: /mnt/temp_ram/fenrir.sh / > /mnt/temp_ram/fenrir.log
+      shell: /mnt/temp_ram/fenrir.sh / 2>&1 | tee /mnt/temp_ram/fenrir.log
+      register: output
+    - debug: msg="{{ output.stdout_lines }}"
+
     - name: Fetch Log file
       fetch: src=/mnt/temp_ram/fenrir.log dest=./
+      
     - name: Unmount temporary RAM drive
-      command: umount /mnt/temp_ram/
+#      command: umount -f /mnt/temp_ram/
+      mount:
+        path: /mnt/temp_ram
+        state: unmounted
+        
     - name: Delete folder for temporary RAM drive
-      command: rmdir /mnt/temp_ram/
-
+#      command: rmdir /mnt/temp_ram/
+#      ignore_errors: yes
+      file:
+        path: /mnt/temp_ram
+        state: absent
